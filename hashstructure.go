@@ -184,7 +184,7 @@ func (w *walker) visit(v reflect.Value, opts *visitOpts) (uint64, error) {
 	switch v.Kind() {
 	case reflect.Int:
 		v = reflect.ValueOf(int64(v.Int()))
-	case reflect.Uint:
+	case reflect.Uint, reflect.Uintptr:
 		v = reflect.ValueOf(uint64(v.Uint()))
 	case reflect.Bool:
 		var tmp int8

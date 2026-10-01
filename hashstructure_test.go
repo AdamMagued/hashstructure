@@ -3,6 +3,7 @@ package hashstructure
 import (
 	"fmt"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -35,6 +36,8 @@ func TestHash_identity(t *testing.T) {
 			Foo: "foo",
 			Bar: []interface{}{nil, nil, nil},
 		},
+		uintptr(42),
+		syscall.Errno(2),
 	}
 
 	for _, tc := range cases {
@@ -728,4 +731,68 @@ func (t *testHashablePointer) Hash() (uint64, error) {
 	}
 
 	return 100, nil
+}
+
+func TestHash_uintptr(t *testing.T) {
+	for _, format := range []Format{FormatV1, FormatV2} {
+		h1, err := Hash(uintptr(42), format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash uintptr with format %v: %s", format, err)
+		}
+		h2, err := Hash(uintptr(42), format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash uintptr with format %v: %s", format, err)
+		}
+		if h1 != h2 {
+			t.Fatalf("hash mismatch: %d != %d", h1, h2)
+		}
+
+		h3, err := Hash(uintptr(43), format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash uintptr with format %v: %s", format, err)
+		}
+		if h1 == h3 {
+			t.Fatalf("expected different hashes for different uintptr values: %d", h1)
+		}
+	}
+}
+
+func TestHash_syscallErrno(t *testing.T) {
+	for _, format := range []Format{FormatV1, FormatV2} {
+		var errVal syscall.Errno
+		h1, err := Hash(errVal, format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash syscall.Errno(0) with format %v: %s", format, err)
+		}
+		h2, err := Hash(syscall.Errno(0), format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash syscall.Errno(0) with format %v: %s", format, err)
+		}
+		if h1 != h2 {
+			t.Fatalf("hash mismatch: %d != %d", h1, h2)
+		}
+
+		h3, err := Hash(syscall.Errno(2), format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash syscall.Errno(2) with format %v: %s", format, err)
+		}
+		if h1 == h3 {
+			t.Fatalf("expected different hashes for different errno values: %d", h1)
+		}
+
+		type S struct {
+			Err syscall.Errno
+		}
+		hs1, err := Hash(S{Err: syscall.Errno(1)}, format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash struct with syscall.Errno: %s", err)
+		}
+		hs2, err := Hash(S{Err: syscall.Errno(1)}, format, nil)
+		if err != nil {
+			t.Fatalf("failed to hash struct with syscall.Errno: %s", err)
+		}
+		if hs1 != hs2 {
+			t.Fatalf("hash mismatch: %d != %d", hs1, hs2)
+		}
+	}
 }

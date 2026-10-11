@@ -396,6 +396,18 @@ func TestHash_equalNil(t *testing.T) {
 			false,
 			true,
 		},
+		{
+			struct{ A *int }{},
+			struct{ A *int }{A: new(int)},
+			true,
+			true,
+		},
+		{
+			struct{ A *int }{},
+			struct{ A *int }{A: new(int)},
+			false,
+			false,
+		},
 	}
 
 	for _, tc := range cases {
@@ -417,6 +429,85 @@ func TestHash_equalNil(t *testing.T) {
 		if (one == two) != tc.Match {
 			t.Fatalf("bad, expected: %#v\n\n%#v\n\n%#v", tc.Match, tc.One, tc.Two)
 		}
+	}
+}
+
+func TestHash_zeroNilIntPointer(t *testing.T) {
+	type tInt struct {
+		A *int
+	}
+	var zero int
+
+	for _, format := range []Format{FormatV1, FormatV2} {
+		t.Run(fmt.Sprintf("format_%d", format), func(t *testing.T) {
+			// ZeroNil: false (default) must produce distinct hashes
+			hNilDefault, err := Hash(tInt{}, format, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			hZeroDefault, err := Hash(tInt{A: &zero}, format, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if hNilDefault == hZeroDefault {
+				t.Fatalf("expected distinct hashes when ZeroNil is false (default), got identical: %d", hNilDefault)
+			}
+
+			// Explicit ZeroNil: false
+			optsFalse := &HashOptions{ZeroNil: false}
+			hNilFalse, err := Hash(tInt{}, format, optsFalse)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			hZeroFalse, err := Hash(tInt{A: &zero}, format, optsFalse)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if hNilFalse == hZeroFalse {
+				t.Fatalf("expected distinct hashes when ZeroNil is false, got identical: %d", hNilFalse)
+			}
+
+			// Explicit ZeroNil: true must produce identical hashes
+			optsTrue := &HashOptions{ZeroNil: true}
+			hNilTrue, err := Hash(tInt{}, format, optsTrue)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			hZeroTrue, err := Hash(tInt{A: &zero}, format, optsTrue)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if hNilTrue != hZeroTrue {
+				t.Fatalf("expected identical hashes when ZeroNil is true, got %d vs %d", hNilTrue, hZeroTrue)
+			}
+
+			// Direct pointer hashing
+			var pNil *int
+			pZero := &zero
+			hPNilFalse, err := Hash(pNil, format, optsFalse)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			hPZeroFalse, err := Hash(pZero, format, optsFalse)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if hPNilFalse == hPZeroFalse {
+				t.Fatalf("expected distinct hashes for direct pointers when ZeroNil is false, got identical: %d", hPNilFalse)
+			}
+
+			hPNilTrue, err := Hash(pNil, format, optsTrue)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			hPZeroTrue, err := Hash(pZero, format, optsTrue)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if hPNilTrue != hPZeroTrue {
+				t.Fatalf("expected identical hashes for direct pointers when ZeroNil is true, got %d vs %d", hPNilTrue, hPZeroTrue)
+			}
+		})
 	}
 }
 

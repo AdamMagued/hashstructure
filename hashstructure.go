@@ -151,6 +151,8 @@ var timeType = reflect.TypeOf(time.Time{})
 
 func (w *walker) visit(v reflect.Value, opts *visitOpts) (uint64, error) {
 	t := reflect.TypeOf(0)
+	var isPtr bool
+	var ptrElemType reflect.Type
 
 	// Loop since these can be wrapped in multiple layers of pointers
 	// and interfaces.
@@ -164,8 +166,13 @@ func (w *walker) visit(v reflect.Value, opts *visitOpts) (uint64, error) {
 		}
 
 		if v.Kind() == reflect.Ptr {
+			isPtr = true
+			ptrElemType = v.Type().Elem()
+			for ptrElemType.Kind() == reflect.Ptr {
+				ptrElemType = ptrElemType.Elem()
+			}
 			if w.zeronil {
-				t = v.Type().Elem()
+				t = ptrElemType
 			}
 			v = reflect.Indirect(v)
 			continue
@@ -176,6 +183,11 @@ func (w *walker) visit(v reflect.Value, opts *visitOpts) (uint64, error) {
 
 	// If it is nil, treat it like a zero.
 	if !v.IsValid() {
+		if isPtr && !w.zeronil {
+			w.h.Reset()
+			_, err := w.h.Write([]byte("nil:" + ptrElemType.String()))
+			return w.h.Sum64(), err
+		}
 		v = reflect.Zero(t)
 	}
 
